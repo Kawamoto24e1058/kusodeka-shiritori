@@ -75,8 +75,7 @@
 	// Map decibel range [-60 dB, +10 dB] linearly to [0, 1] for visual elements (70 dB dynamic range)
 	function dbToFraction(db: number): number {
 		if (db <= -60.0) return 0;
-		if (db >= 10.0) return 1.0;
-		return (db + 60.0) / 70.0;
+		return Math.min(1.0, (db + 60.0) / 70.0);
 	}
 
 	// Map decibel range [-60 dB, +10 dB] to percentage [0, 100] for text display
@@ -146,7 +145,7 @@
 		return clean ? clean.charAt(0) : '';
 	}
 
-	// Extract the ending character of a word, applying Shiritori rules
+	// Extract the ending character(s) of a word, applying Shiritori rules
 	function getEndChar(word: string): string {
 		let clean = cleanHiragana(word);
 		if (!clean) return '';
@@ -156,13 +155,21 @@
 			clean = clean.slice(0, -1);
 		}
 
+		if (clean.length === 0) return '';
+
 		const lastChar = clean.charAt(clean.length - 1);
 
-		// Map small characters to standard sizes
+		// List of small characters that should be combined with the preceding character
+		const smallChars = ['ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ', 'ゃ', 'ゅ', 'ょ', 'ゎ'];
+
+		if (smallChars.includes(lastChar) && clean.length > 1) {
+			// Return the last two characters combined (e.g., "しゅ")
+			return clean.slice(-2);
+		}
+
+		// Map other small characters like 'っ' to standard sizes
 		const smallToLarge: Record<string, string> = {
-			'ぁ': 'あ', 'ぃ': 'い', 'ぅ': 'う', 'ぇ': 'え', 'ぉ': 'お',
-			'ゃ': 'や', 'ゅ': 'ゆ', 'ょ': 'よ', 'っ': 'つ', 'ゎ': 'わ',
-			'ヶ': 'け', 'ヵ': 'か'
+			'っ': 'つ', 'ヶ': 'け', 'ヵ': 'か'
 		};
 
 		return smallToLarge[lastChar] || lastChar;
@@ -456,7 +463,8 @@
 		// 4. Shiritori link check
 		if (!linkBypassed && lastWordReading) {
 			const expectedStart = getEndChar(lastWordReading);
-			const actualStart = getStartChar(reading);
+			const cleanReading = cleanHiragana(reading);
+			const actualStart = cleanReading.slice(0, expectedStart.length);
 
 			if (expectedStart !== actualStart) {
 				triggerShake();
@@ -613,7 +621,7 @@
 				if (rms > 0.0001) {
 					db = 20 * Math.log10(rms);
 				}
-				db = Math.max(-60.0, Math.min(10.0, db));
+				db = Math.max(-60.0, db);
 				noiseSamples.push(db);
 			}
 			requestAnimationFrame(sampleLoop);
@@ -751,7 +759,7 @@
 				if (rms > 0.0001) {
 					db = 20 * Math.log10(rms);
 				}
-				db = Math.max(-60.0, Math.min(10.0, db));
+				db = Math.max(-60.0, db);
 				
 				untrack(() => {
 					currentVolume = db;
